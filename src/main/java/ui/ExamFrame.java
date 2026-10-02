@@ -31,26 +31,42 @@ public class ExamFrame extends JFrame {
     private int index;
     private boolean finished;
     private boolean updating;
+    private int violations;
+    private final int maxViolations = config.AppConfig.getInt("security.maxViolations", 3);
 
-    public ExamFrame(AttemptService.ExamSession session, Runnable onDone) {
-        super("Exam - " + session.exam().title());
-        this.session = session;
-        this.onDone = onDone;
-        answers.putAll(session.answers());
-        setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
-        addWindowListener(new WindowAdapter() {
-            @Override public void windowClosing(WindowEvent e) { leave(); }
-        });
-        buildUi();
-        for (int i = 0; i < session.questions().size(); i++) listModel.addElement("");
-        refreshList();
-        show(0);
-        timer = new javax.swing.Timer(1000, e -> tick());
-        timer.start();
-        tick();
-        setSize(950, 600);
-        setLocationRelativeTo(null);
-    }
+   public ExamFrame(AttemptService.ExamSession session, Runnable onDone) {
+    super("Exam - " + session.exam().title());
+    this.session = session;
+    this.onDone = onDone;
+    answers.putAll(session.answers());
+    setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
+    setUndecorated(true);
+    addWindowListener(new WindowAdapter() {
+        @Override public void windowClosing(WindowEvent e) { leave(); }
+    });
+    addWindowFocusListener(new WindowAdapter() {
+        @Override public void windowLostFocus(WindowEvent e) {
+            javax.swing.Timer t = new javax.swing.Timer(400, ev -> {
+                Window active = KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow();
+                if (!finished && active != ExamFrame.this && (active == null || active.getOwner() != ExamFrame.this))
+                    violation("LEFT_EXAM_WINDOW");
+            });
+            t.setRepeats(false);
+            t.start();
+        }
+    });
+    buildUi();
+    for (int i = 0; i < session.questions().size(); i++) listModel.addElement("");
+    refreshList();
+    show(0);
+    timer = new javax.swing.Timer(1000, e -> tick());
+    timer.start();
+    tick();
+    setSize(950, 600);
+    setLocationRelativeTo(null);
+    setExtendedState(JFrame.MAXIMIZED_BOTH);
+    setAlwaysOnTop(true);
+}
 
     private void buildUi() {
         JPanel root = new JPanel(new BorderLayout(10, 10));
@@ -183,6 +199,23 @@ public class ExamFrame extends JFrame {
         }
     }
 
+    private void violation(String type) {
+    if (finished) return;
+    violations++;
+    try {
+        AttemptService.reportViolation(session.attempt().id(), type);
+    } catch (RuntimeException ex) {
+        util.Log.warn("Could not record violation: " + ex.getMessage());
+    }
+    if (violations >= maxViolations) {
+        Ui.info(this, "Too many violations. Your exam is being submitted.");
+        finish(true);
+    } else {
+        Ui.info(this, "Warning " + violations + " of " + maxViolations
+                + ": do not leave the exam window. At " + maxViolations + " the exam is submitted automatically.");
+    }
+    }
+    
     private void leave() {
         if (finished) { closeScreen(); return; }
         if (Ui.confirm(this, "The exam is still running and the timer keeps counting.\nLeave now? You can resume until time runs out.")) {

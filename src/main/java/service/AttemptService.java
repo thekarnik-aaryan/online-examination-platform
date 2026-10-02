@@ -1,22 +1,31 @@
 package service;
 
+import java.security.SecureRandom;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
+
 import config.Database;
 import dao.AttemptDao;
 import dao.ExamDao;
 import dao.QuestionDao;
 import exception.AccessDeniedException;
 import exception.AppException;
-import model.*;
+import model.Attempt;
+import model.Exam;
+import model.Question;
+import model.Result;
+import model.Role;
+import model.User;
 import security.Authz;
 import util.Log;
-
-import java.security.SecureRandom;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.time.LocalDateTime;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 /** Student exam flow: eligibility, start, answer saving, submission and evaluation. */
 public final class AttemptService {
@@ -135,5 +144,13 @@ public final class AttemptService {
         boolean late = auto || now.isAfter(a.deadline());
         AttemptDao.markSubmitted(c, a.id(), late ? "AUTO_SUBMITTED" : "SUBMITTED", now);
         return AttemptDao.resultOf(c, a.id());
+    }
+
+
+public static void reportViolation(long attemptId, String type) {
+        User me = Authz.require(Role.STUDENT);
+        Attempt a = Database.read(c -> AttemptDao.findById(c, attemptId, false));
+        requireOwn(a, me);
+        if (a.inProgress()) AuditService.log("EXAM_VIOLATION", "attemptId=" + attemptId + ", type=" + type);
     }
 }
