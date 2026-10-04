@@ -69,5 +69,5 @@ Schedule the dump (cron / Task Scheduler), store copies off-machine, and test re
 - Direct DB connections from every client: each client machine needs DB credentials, so use the least-privilege account on a trusted LAN only.
 - Database calls run on the Swing event thread (simple, but the UI can pause during slow queries or BCrypt hashing).
 - Lockout is per existing username; unknown usernames are audited but not rate-limited.
-- Fixed 4-option single-answer MCQs; no CSV import, pagination, password-reset email or result export.
+- Fixed 4-option single-answer MCQs
 - `schema.sql` uses `DELIMITER`, so run it with the `mysql` client (not a JDBC runner).
