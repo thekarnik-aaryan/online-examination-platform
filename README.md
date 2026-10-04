@@ -65,7 +65,6 @@ mysql -u root -p online_exam < backup_YYYY-MM-DD.sql
 Schedule the dump (cron / Task Scheduler), store copies off-machine, and test restores. Use `--triggers` so integrity triggers survive a restore.
 
 ## Known limitations
-- **A desktop client cannot guarantee a secure exam.** Client-side anti-cheating (full screen, focus detection, etc.) is bypassable; the app does not attempt it. Use supervised labs for high-stakes exams.
 - Time checks use the client machine clock (both the countdown and the stored deadline). A user who changes the system clock can gain time. A real deployment needs a server-side API with its own clock.
 - Direct DB connections from every client: each client machine needs DB credentials, so use the least-privilege account on a trusted LAN only.
 - Database calls run on the Swing event thread (simple, but the UI can pause during slow queries or BCrypt hashing).
