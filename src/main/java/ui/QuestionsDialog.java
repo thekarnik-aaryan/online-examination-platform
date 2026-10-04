@@ -10,6 +10,7 @@ import javax.swing.*;
 import java.awt.Window;
 import java.util.ArrayList;
 import java.util.List;
+import service.CsvQuestionImporter;
 
 public class QuestionsDialog extends JDialog {
     public QuestionsDialog(Window owner, Exam exam) {
@@ -28,6 +29,8 @@ public class QuestionsDialog extends JDialog {
             addButton("Add question", () -> edit(null));
             addButton("Edit", () -> edit(selected()));
             addButton("Delete", this::delete);
+            addButton("Download CSV template", this::saveTemplate);
+            addButton("Import CSV", this::importCsv);
             refresh();
         }
 
@@ -64,6 +67,26 @@ public class QuestionsDialog extends JDialog {
             if (saved) refresh();
         }
 
+        private void saveTemplate() {
+            JFileChooser fc = new JFileChooser();
+            fc.setSelectedFile(new java.io.File("questions_template.csv"));
+            if (fc.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
+            java.io.File f = fc.getSelectedFile();
+            if (f.exists() && !Ui.confirm(this, "Replace the existing file?")) return;
+            CsvQuestionImporter.writeTemplate(f.toPath());
+            Ui.info(this, "Template saved. Open it in Excel, add your questions, then Save As -> CSV.");
+        }
+
+        private void importCsv() {
+            JFileChooser fc = new JFileChooser();
+            fc.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("CSV files", "csv"));
+            if (fc.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
+            List<CsvQuestionImporter.Row> parsed = CsvQuestionImporter.parse(fc.getSelectedFile().toPath());
+            if (!Ui.confirm(this, parsed.size() + " question(s) found. Import them into '" + exam.title() + "'?")) return;
+            int n = ExamService.importQuestions(exam.id(), parsed);
+            Ui.info(this, n + " question(s) imported.");
+            refresh();
+        }
         private void delete() {
             Question q = selected();
             if (Ui.confirm(this, "Delete this question?")) {

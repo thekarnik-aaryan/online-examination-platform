@@ -1,5 +1,13 @@
 package service;
 
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+
 import config.Database;
 import dao.AttemptDao;
 import dao.ExamDao;
@@ -8,17 +16,14 @@ import dao.SubjectDao;
 import exception.AccessDeniedException;
 import exception.AppException;
 import exception.ValidationException;
-import model.*;
+import model.Exam;
+import model.Question;
+import model.Result;
+import model.Role;
+import model.Subject;
+import model.User;
 import security.Authz;
 import util.Validator;
-
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
 
 /** Subject, exam and question management for Admin and Faculty. */
 public final class ExamService {
@@ -153,6 +158,22 @@ public final class ExamService {
         AuditService.log("QUESTION_DELETE", "examId=" + examId + ", questionId=" + questionId);
     }
 
+    public static int importQuestions(long examId, List<CsvQuestionImporter.Row> rows) {
+    User u = Authz.require(Role.ADMIN, Role.FACULTY);
+    if (rows == null || rows.isEmpty()) throw new ValidationException("There are no questions to import.");
+    Database.tx(c -> {
+        requireManageable(c, u, examId);
+        if (AttemptDao.examHasAttempts(c, examId))
+            throw new AppException("Questions cannot be changed after students have attempted this exam.");
+        if (QuestionDao.countForExam(c, examId) + rows.size() > MAX_QUESTIONS)
+            throw new ValidationException("An exam can have at most " + MAX_QUESTIONS + " questions.");
+        for (CsvQuestionImporter.Row r : rows) QuestionDao.insert(c, examId, r.text(), r.marks(), r.options(), r.correct());
+        return null;
+    });
+    AuditService.log("QUESTIONS_IMPORT", "examId=" + examId + ", count=" + rows.size());
+    return rows.size();
+    }
+    
     // ---------- results (read-only) ----------
     public static List<Result> results() {
         User u = Authz.require(Role.ADMIN, Role.FACULTY);
